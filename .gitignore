@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+*.log
+.env
+.dev.vars
+cpu_check.ps1
+scan.ps1
+test_health.py
+test_logic.py
+test_paid.py

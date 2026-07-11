@@ -1,0 +1,15 @@
+# Sparks RE API
+> Real estate data normalization, FHA compliance checking, and investment metrics.
+> Operated by Sparks Digital LLC (Indiana).
+> Payment: x402 protocol (USDC on Base network).
+
+## Endpoints
+- POST /property/factual ($0.03) — Normalize raw property text into structured JSON
+- POST /property/fha-compliance ($0.05) — Check listing text for Fair Housing Act violations
+- POST /property/investor-metrics ($0.10) — Calculate cap rate, cash-on-cash, DSCR, cashflow
+
+## Authentication
+No API keys. Payment via x402 HTTP headers (USDC on Base).
+
+## Contact
+Sparks Digital LLC — sparksdigitalllc@email.com
