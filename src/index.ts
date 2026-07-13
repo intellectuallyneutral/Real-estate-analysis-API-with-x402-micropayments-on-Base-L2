@@ -9,6 +9,7 @@ import { calculateMetrics } from "./endpoints/investorMetrics";
 import { checkFhaCompliance } from "./endpoints/fhaCompliance";
 import { landingPageHtml } from "./utils/landingPageHtml";
 import { analyzePropertyImage } from "./endpoints/imageAnalyzer";
+import { analyzePropertyText } from "./endpoints/textAnalyzer";
 
 const app = new Hono();
 
@@ -150,6 +151,64 @@ const x402Config = {
         }
       })
     }
+  },
+  "POST /property/analyze-text": {
+    accepts: {
+      scheme: "exact",
+      price: "$0.05",
+      network: NETWORK,
+      payTo: WALLET_ADDRESS,
+    },
+    description: "Submit raw property text/MLS copy. Uses Gemini to extract property specs, scan for FHA compliance violations, and calculate investment financials in a single report. Cost: $0.05 USDC.",
+    extensions: {
+      ...declareDiscoveryExtension({
+        input: { text: "Stunning 3-bed family starter in a Christian neighborhood... Price is $295,000. Rent estimate $2,200." },
+        inputSchema: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "Raw listing description copy" }
+          },
+          required: ["text"]
+        },
+        bodyType: "json",
+        output: {
+          example: {
+            listing_data: { address: "789 Maple Ave", city: "Indianapolis", state: "IN", zip: "46220", bedrooms: 3, bathrooms: 2, square_feet: 1850, lot_size: "0.25 acres", year_built: 1998, property_type: "SFR", raw_price: "$295,000", monthly_rent: 2200 },
+            fha_report: { is_compliant: false, violation_count: 1, flagged_phrases: [{ phrase: "Christian neighborhood", violation_category: "Religion", suggestion: "local neighborhood" }], compliant_rewrite: "..." },
+            investor_metrics: { purchase_price: 295000, down_payment: 59000, loan_amount: 236000, monthly_mortgage: 1569.96, monthly_expenses: 2132.96, monthly_cashflow: 67.04, annual_noi: 20112, cap_rate_percent: 6.82, cash_on_cash_percent: 1.36, dscr: 1.25, gross_rent_multiplier: 11.17 }
+          }
+        }
+      })
+    }
+  },
+  "POST /property/analyze-url": {
+    accepts: {
+      scheme: "exact",
+      price: "$0.05",
+      network: NETWORK,
+      payTo: WALLET_ADDRESS,
+    },
+    description: "Submit a listing webpage URL to scrape. Scrapes public details, extracts specs, and auto-calculates compliance and financials in a single report. Recommends screenshot fallback if blocked. Cost: $0.05 USDC.",
+    extensions: {
+      ...declareDiscoveryExtension({
+        input: { url: "https://mypropertylisting.com/123-main" },
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Real estate listing webpage URL" }
+          },
+          required: ["url"]
+        },
+        bodyType: "json",
+        output: {
+          example: {
+            listing_data: { address: "123 Main St", city: "Indianapolis", state: "IN", zip: "46204", bedrooms: 3, bathrooms: 2, square_feet: 1500, lot_size: "0.20 acres", year_built: 2010, property_type: "SFR", raw_price: "$250,000", monthly_rent: 2000 },
+            fha_report: { is_compliant: true, violation_count: 0, flagged_phrases: [], compliant_rewrite: "..." },
+            investor_metrics: { purchase_price: 250000, down_payment: 50000, loan_amount: 200000, monthly_mortgage: 1330.60, monthly_expenses: 1774.17, monthly_cashflow: 225.83, annual_noi: 19440, cap_rate_percent: 7.78, cash_on_cash_percent: 5.42, dscr: 1.35, gross_rent_multiplier: 10.42 }
+          }
+        }
+      })
+    }
   }
 };
 
@@ -194,6 +253,8 @@ app.get("/health", (c) => {
       { path: "/property/factual", price: "$0.03", method: "POST" },
       { path: "/property/fha-compliance", price: "$0.05", method: "POST" },
       { path: "/property/investor-metrics", price: "$0.10", method: "POST" },
+      { path: "/property/analyze-text", price: "$0.05", method: "POST" },
+      { path: "/property/analyze-url", price: "$0.05", method: "POST" },
       { path: "/property/analyze-image", price: "$0.15", method: "POST" }
     ]
   });
@@ -519,6 +580,35 @@ function processConsolidatedAnalysis(result: any) {
   };
 }
 
+// Helper function to scrape URL text
+async function scrapeUrlText(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Scrubbing failed: Site returned status ${response.status}`);
+  }
+  
+  const html = await response.text();
+  
+  // Simple HTML tag stripper to get clean text
+  let text = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+    
+  if (text.length > 40000) {
+    text = text.substring(0, 40000);
+  }
+  
+  return text;
+}
+
 // Paid Image Analyzer Endpoint (x402 protected)
 app.post("/property/analyze-image", lazyPaymentMiddleware(), async (c) => {
   try {
@@ -536,6 +626,50 @@ app.post("/property/analyze-image", lazyPaymentMiddleware(), async (c) => {
   } catch (e: any) {
     console.error("Image analysis endpoint error:", e);
     return c.json({ error: e.message || "Failed to analyze property image" }, 500);
+  }
+});
+
+// Paid Text Analyzer Endpoint (x402 protected)
+app.post("/property/analyze-text", lazyPaymentMiddleware(), async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!body.text || typeof body.text !== "string") {
+      return c.json({ error: "Missing required field: text" }, 400);
+    }
+    const apiKey = (c.env as any).GEMINI_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Server configuration error: Gemini API key is missing." }, 500);
+    }
+    const rawResult = await analyzePropertyText(body.text, apiKey);
+    const consolidated = processConsolidatedAnalysis(rawResult);
+    return c.json({ ...consolidated, disclaimer: "Automated AI extraction and rule-based calculations. Estimates only, not legal or financial advice. Verify all values." });
+  } catch (e: any) {
+    console.error("Text analysis endpoint error:", e);
+    return c.json({ error: e.message || "Failed to analyze property text" }, 500);
+  }
+});
+
+// Paid URL Analyzer Endpoint (x402 protected)
+app.post("/property/analyze-url", lazyPaymentMiddleware(), async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!body.url || typeof body.url !== "string") {
+      return c.json({ error: "Missing required field: url" }, 400);
+    }
+    const apiKey = (c.env as any).GEMINI_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Server configuration error: Gemini API key is missing." }, 500);
+    }
+    
+    // Scrape URL text
+    const scrapedText = await scrapeUrlText(body.url);
+    
+    const rawResult = await analyzePropertyText(scrapedText, apiKey);
+    const consolidated = processConsolidatedAnalysis(rawResult);
+    return c.json({ ...consolidated, disclaimer: "Automated AI extraction and rule-based calculations from scraped webpage. Estimates only, not legal or financial advice. Verify all values." });
+  } catch (e: any) {
+    console.error("URL analysis endpoint error:", e);
+    return c.json({ error: e.message || "This website does not support URL scrubbing due to anti-bot protection. Please upload a screenshot instead." }, 400);
   }
 });
 
@@ -590,6 +724,50 @@ app.post("/property/free-trial-image", async (c) => {
   } catch (e: any) {
     console.error("Free trial image error:", e);
     return c.json({ error: e.message || "Failed to analyze image" }, 500);
+  }
+});
+
+// Free Trial Text Endpoint for Sandbox Interface
+app.post("/property/free-trial-text", async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!body.text || typeof body.text !== "string") {
+      return c.json({ error: "Missing text data" }, 400);
+    }
+    const apiKey = (c.env as any).GEMINI_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Server configuration error: Gemini API key is missing." }, 500);
+    }
+    const rawResult = await analyzePropertyText(body.text, apiKey);
+    const consolidated = processConsolidatedAnalysis(rawResult);
+    return c.json(consolidated);
+  } catch (e: any) {
+    console.error("Free trial text error:", e);
+    return c.json({ error: e.message || "Failed to analyze text" }, 500);
+  }
+});
+
+// Free Trial URL Endpoint for Sandbox Interface
+app.post("/property/free-trial-url", async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!body.url || typeof body.url !== "string") {
+      return c.json({ error: "Missing URL data" }, 400);
+    }
+    const apiKey = (c.env as any).GEMINI_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Server configuration error: Gemini API key is missing." }, 500);
+    }
+    
+    // Scrape URL text
+    const scrapedText = await scrapeUrlText(body.url);
+    
+    const rawResult = await analyzePropertyText(scrapedText, apiKey);
+    const consolidated = processConsolidatedAnalysis(rawResult);
+    return c.json(consolidated);
+  } catch (e: any) {
+    console.error("Free trial URL error:", e);
+    return c.json({ error: "This website does not support URL scrubbing due to anti-bot protection. Please take a screenshot and use the Image Uploader tab instead!" }, 400);
   }
 });
 

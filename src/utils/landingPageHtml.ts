@@ -434,6 +434,26 @@ export const landingPageHtml = `
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
     }
 
+    /* Warning/Failure Box */
+    .warning-box {
+      background: rgba(239, 68, 68, 0.05);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      border-radius: 8px;
+      padding: 16px;
+      color: #fca5a5;
+      font-size: 13px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .warning-box-title {
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     /* Image Drop Zone */
     .drop-zone {
       border: 2px dashed rgba(255, 255, 255, 0.15);
@@ -727,7 +747,7 @@ export const landingPageHtml = `
       <div class="trial-counter-alert" id="trial-alert">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
         <span>Your free preview is active! Remaining free trial queries:</span>
-        <span class="trial-count-number" id="trial-count">3</span>
+        <span class="trial-count-number" id="trial-count">5</span>
       </div>
     </section>
 
@@ -735,37 +755,76 @@ export const landingPageHtml = `
     <section id="playground" class="playground-section">
       <div class="section-header">
         <h2 class="section-title">API Playground</h2>
-        <p class="section-desc">Try out all four endpoints interactively. Watch the JSON outputs load in real time.</p>
+        <p class="section-desc">Try out all entry methods interactively. Watch the consolidated AI reports load in real time.</p>
       </div>
 
       <div class="playground-card">
         <div class="playground-tabs">
-          <button class="tab-btn active" onclick="switchTab('image-upload')">
+          <button class="tab-btn active" id="tab-url-analyzer" onclick="switchTab('url-analyzer')">
+            🔍 URL Analyzer
+          </button>
+          <button class="tab-btn" id="tab-image-upload" onclick="switchTab('image-upload')">
             📷 Image Uploader
           </button>
-          <button class="tab-btn" onclick="switchTab('fha-compliance')">
-            ⚖️ FHA Compliance
+          <button class="tab-btn" id="tab-text-analyzer" onclick="switchTab('text-analyzer')">
+            ✍️ Text Analyzer
           </button>
-          <button class="tab-btn" onclick="switchTab('property-normalizer')">
-            📇 Normalizer
-          </button>
-          <button class="tab-btn" onclick="switchTab('investor-metrics')">
-            📊 Financials
+          <button class="tab-btn" id="tab-investor-metrics" onclick="switchTab('investor-metrics')">
+            📊 Quick Calculator
           </button>
         </div>
 
+        <!-- Tab Panel: URL Analyzer -->
+        <div id="panel-url-analyzer" class="tab-panel active">
+          <div class="panel-grid">
+            <div class="panel-input">
+              <div class="panel-title">
+                <span>Enter Listing Webpage URL</span>
+                <span class="price-tag">Extracts URL + full report</span>
+              </div>
+              <div class="input-group">
+                <label class="input-label">Listing URL</label>
+                <input type="url" id="url-input" class="input-field" placeholder="https://www.zillow.com/homedetails/...">
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 8px;">
+                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillUrlSample(1)">Sample 1 (Scrubbable Blog)</span> | 
+                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillUrlSample(2)">Sample 2 (Protected Zillow)</span>
+              </div>
+              
+              <!-- Warning/Fallback Alert -->
+              <div class="warning-box" id="url-warning">
+                <div class="warning-box-title">
+                  ⚠️ Scrubbing Blocked
+                </div>
+                <div id="url-warning-text">
+                  This website does not support URL scrubbing due to anti-bot protection. Please take a screenshot of the listing and upload it using the <strong>Image Uploader</strong> tab instead!
+                </div>
+              </div>
+
+              <button class="btn btn-primary" style="justify-content: center;" onclick="runUrlAnalysis()" id="btn-run-url">Scrape & Analyze URL</button>
+            </div>
+            <div class="panel-output">
+              <div class="panel-title">API Response JSON</div>
+              <div class="output-container" id="output-url">
+                <div class="output-placeholder">Enter a webpage URL and run analysis to view output.</div>
+                <div class="loader"><div class="spinner"></div><span>Scrubbing listing page and generating report...</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Tab Panel: Image Uploader -->
-        <div id="panel-image-upload" class="tab-panel active">
+        <div id="panel-image-upload" class="tab-panel">
           <div class="panel-grid">
             <div class="panel-input">
               <div class="panel-title">
                 <span>Upload Screenshot</span>
-                <span class="price-tag">Extracts everything + analysis</span>
+                <span class="price-tag">Extracts image + full report</span>
               </div>
               <div class="drop-zone" id="drop-zone">
                 <div class="drop-zone-icon">📥</div>
                 <div class="drop-zone-text">Drag & drop listing screenshot here or click to browse</div>
-                <div class="drop-zone-subtext">Supports PNG, JPG, WebP. Recommended: screenshot of listing specifications, price, and description.</div>
+                <div class="drop-zone-subtext">Supports PNG, JPG, WebP. Recommended: screenshot of listing specs, price, and description.</div>
                 <input type="file" id="file-input" accept="image/*" style="display: none;">
               </div>
               <div class="image-preview-container" id="preview-container">
@@ -786,57 +845,32 @@ export const landingPageHtml = `
           </div>
         </div>
 
-        <!-- Tab Panel: FHA Compliance -->
-        <div id="panel-fha-compliance" class="tab-panel">
+        <!-- Tab Panel: Text Analyzer -->
+        <div id="panel-text-analyzer" class="tab-panel">
           <div class="panel-grid">
             <div class="panel-input">
               <div class="panel-title">
-                <span>Marketing Copy</span>
-                <span class="price-tag">$0.05</span>
+                <span>Copy-Paste Listing Remarks</span>
+                <span class="price-tag">Extracts text + full report</span>
               </div>
-              <textarea id="fha-input" class="input-field" placeholder="Enter listing description remarks to scan..."></textarea>
+              <textarea id="text-analyzer-input" class="input-field" placeholder="Enter listing description remarks to analyze..."></textarea>
               <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 8px;">
-                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillFhaSample(1)">Sample 1 (Violations)</span> | 
-                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillFhaSample(2)">Sample 2 (Compliant)</span>
+                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillTextSample(1)">Sample 1 (Violations)</span> | 
+                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillTextSample(2)">Sample 2 (Compliant)</span>
               </div>
-              <button class="btn btn-primary" style="justify-content: center;" onclick="runFhaScan()" id="btn-run-fha">Scan FHA Compliance</button>
+              <button class="btn btn-primary" style="justify-content: center;" onclick="runTextAnalysis()" id="btn-run-text">Analyze Raw Copy</button>
             </div>
             <div class="panel-output">
               <div class="panel-title">API Response JSON</div>
-              <div class="output-container" id="output-fha">
-                <div class="output-placeholder">Submit listing copy to see scan results.</div>
-                <div class="loader"><div class="spinner"></div><span>Scanning for FHA violations...</span></div>
+              <div class="output-container" id="output-text">
+                <div class="output-placeholder">Submit listing copy to see consolidated FHA and investment report.</div>
+                <div class="loader"><div class="spinner"></div><span>Extracting listing parameters and analyzing compliance...</span></div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Tab Panel: Property Normalizer -->
-        <div id="panel-property-normalizer" class="tab-panel">
-          <div class="panel-grid">
-            <div class="panel-input">
-              <div class="panel-title">
-                <span>Unstructured Listing Text</span>
-                <span class="price-tag">$0.03</span>
-              </div>
-              <textarea id="normalizer-input" class="input-field" placeholder="Enter property specs description..."></textarea>
-              <div style="font-size: 11px; color: var(--text-muted); display: flex; gap: 8px;">
-                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillNormalizerSample(1)">Sample 1</span> | 
-                <span style="cursor: pointer; color: var(--accent-blue);" onclick="fillNormalizerSample(2)">Sample 2</span>
-              </div>
-              <button class="btn btn-primary" style="justify-content: center;" onclick="runNormalize()" id="btn-run-norm">Extract Structured Specs</button>
-            </div>
-            <div class="panel-output">
-              <div class="panel-title">API Response JSON</div>
-              <div class="output-container" id="output-normalizer">
-                <div class="output-placeholder">Submit listing text to see parsed data structure.</div>
-                <div class="loader"><div class="spinner"></div><span>Extracting property variables...</span></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab Panel: Investor Metrics -->
+        <!-- Tab Panel: Investor Metrics (Quick Calculator) -->
         <div id="panel-investor-metrics" class="tab-panel">
           <div class="panel-grid">
             <div class="panel-input">
@@ -850,7 +884,7 @@ export const landingPageHtml = `
                   <input type="number" id="calc-price" class="input-field" value="325000">
                 </div>
                 <div class="input-group">
-                  <label class="input-label">Monthly Rental Rent ($)</label>
+                  <label class="input-label">Monthly Rent ($)</label>
                   <input type="number" id="calc-rent" class="input-field" value="2400">
                 </div>
               </div>
@@ -948,8 +982,8 @@ export const landingPageHtml = `
     updateTrialAlert();
 
     // Fill samples initially
-    fillFhaSample(1);
-    fillNormalizerSample(1);
+    fillUrlSample(1);
+    fillTextSample(1);
 
     // Setup drag and drop for image upload
     const dropZone = document.getElementById("drop-zone");
@@ -1008,7 +1042,7 @@ export const landingPageHtml = `
       document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
 
       // Set active button
-      event.target.classList.add("active");
+      document.getElementById("tab-" + tabId).classList.add("active");
       document.getElementById("panel-" + tabId).classList.add("active");
     }
 
@@ -1024,9 +1058,9 @@ export const landingPageHtml = `
         alertDiv.innerHTML = \`<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg><span>All free trial queries used. Please connect wallet for x402 payments.</span>\`;
         
         // Disable playground buttons
+        document.getElementById("btn-run-url").disabled = true;
         document.getElementById("btn-run-image").disabled = true;
-        document.getElementById("btn-run-fha").disabled = true;
-        document.getElementById("btn-run-norm").disabled = true;
+        document.getElementById("btn-run-text").disabled = true;
         document.getElementById("btn-run-calc").disabled = true;
       }
     }
@@ -1058,9 +1092,9 @@ export const landingPageHtml = `
         updateTrialAlert();
         
         // Re-enable buttons if disabled
+        document.getElementById("btn-run-url").disabled = false;
         document.getElementById("btn-run-image").disabled = false;
-        document.getElementById("btn-run-fha").disabled = false;
-        document.getElementById("btn-run-norm").disabled = false;
+        document.getElementById("btn-run-text").disabled = false;
         document.getElementById("btn-run-calc").disabled = false;
       } else {
         walletConnected = false;
@@ -1075,21 +1109,21 @@ export const landingPageHtml = `
     });
 
     // --- SAMPLES POPULATORS ---
-    function fillFhaSample(num) {
-      const field = document.getElementById("fha-input");
+    function fillUrlSample(num) {
+      const field = document.getElementById("url-input");
       if (num === 1) {
-        field.value = "Stunning 3-bed family starter house located in a quiet, exclusively Christian neighbourhood. Perfect for a mature couple with no kids, or someone looking to retire without family baggage. Call today!";
+        field.value = "https://raw.githubusercontent.com/intellectuallyneutral/Real-estate-analysis-API-with-x402-micropayments-on-Base-L2/main/README.md";
       } else {
-        field.value = "Beautiful 3-bedroom craftsman home featuring a spacious backyard, brand new updates, and high ceilings. Convenient location near public parks and local community centres. Open to all prospective buyers.";
+        field.value = "https://www.zillow.com/homedetails/789-Maple-Ave-Indianapolis-IN-46220/2039485_zpid/";
       }
     }
 
-    function fillNormalizerSample(num) {
-      const field = document.getElementById("normalizer-input");
+    function fillTextSample(num) {
+      const field = document.getElementById("text-analyzer-input");
       if (num === 1) {
-        field.value = "3bd 2ba at 789 Maple Ave, Indianapolis, IN 46220. $295,000. Built 1998. 1,850 sqft single family home on 0.25 acres.";
+        field.value = "Stunning 3-bed family starter house located in a quiet, exclusively Christian neighbourhood. Perfect for a mature couple with no kids, or someone looking to retire without family baggage. Purchase price is $295,000. Rent estimate is $2,200. Call today!";
       } else {
-        field.value = "Cozy 2 bedroom condo with 1.5 baths located at 45 Main Street, Carmel, IN 46032. Listed for $185,000. Built in 2012, 1100 square feet with 1 dedicated parking space.";
+        field.value = "Beautiful 3-bedroom craftsman home featuring a spacious backyard, brand new updates, and high ceilings. Convenient location near public parks and local community centres. Open to all prospective buyers. Listed for $295,000.";
       }
     }
 
@@ -1115,13 +1149,15 @@ export const landingPageHtml = `
     }
 
     // --- API CALL EXECUTIONERS ---
-    async function callApiEndpoint(endpoint, payload, outputEl) {
+    async function callApiEndpoint(endpoint, payload, outputEl, errorBoxEl = null) {
       const container = document.getElementById(outputEl);
       const placeholder = container.querySelector(".output-placeholder");
       const loader = container.querySelector(".loader");
+      const errorBox = errorBoxEl ? document.getElementById(errorBoxEl) : null;
       
       if (placeholder) placeholder.style.display = "none";
       if (loader) loader.style.display = "flex";
+      if (errorBox) errorBox.style.display = "none";
       
       // Clean previous logs
       const logs = container.querySelectorAll("pre");
@@ -1137,16 +1173,41 @@ export const landingPageHtml = `
         if (loader) loader.style.display = "none";
 
         const resData = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(resData.error || \`HTTP error! status: \${response.status}\`);
+        }
+
         const pre = document.createElement("pre");
         pre.innerHTML = formatJsonHtml(resData);
         container.appendChild(pre);
       } catch (err) {
         if (loader) loader.style.display = "none";
+        
+        // Show in API output
         const pre = document.createElement("pre");
         pre.style.color = "var(--accent-red)";
         pre.textContent = "Error: " + err.message;
         container.appendChild(pre);
+
+        // Display user-friendly warning box for URL failures
+        if (errorBox) {
+          errorBox.style.display = "flex";
+        }
       }
+    }
+
+    function runUrlAnalysis() {
+      const urlText = document.getElementById("url-input").value.trim();
+      if (!urlText) {
+        alert("Please enter a webpage URL!");
+        return;
+      }
+      if (!consumeTrial()) return;
+
+      callApiEndpoint("/property/free-trial-url", {
+        url: urlText
+      }, "output-url", "url-warning");
     }
 
     function runImageAnalysis() {
@@ -1162,32 +1223,17 @@ export const landingPageHtml = `
       }, "output-image");
     }
 
-    function runFhaScan() {
-      const text = document.getElementById("fha-input").value.trim();
+    function runTextAnalysis() {
+      const text = document.getElementById("text-analyzer-input").value.trim();
       if (!text) {
-        alert("Please enter listing copy!");
+        alert("Please enter listing description copy!");
         return;
       }
       if (!consumeTrial()) return;
 
-      callApiEndpoint("/property/free-trial", {
-        action: "fha",
-        listing_text: text
-      }, "output-fha");
-    }
-
-    function runNormalize() {
-      const text = document.getElementById("normalizer-input").value.trim();
-      if (!text) {
-        alert("Please enter property listing description text!");
-        return;
-      }
-      if (!consumeTrial()) return;
-
-      callApiEndpoint("/property/free-trial", {
-        action: "normalize",
-        raw_text: text
-      }, "output-normalizer");
+      callApiEndpoint("/property/free-trial-text", {
+        text: text
+      }, "output-text");
     }
 
     function runCalculator() {
@@ -1226,16 +1272,19 @@ export const landingPageHtml = `
 
     const curlCode = \`curl -X POST https://sparks-re-api.sparksdigital-re.workers.dev/property/fha-compliance \\\\
   -H "Content-Type: application/json" \\\\
-  -H "X-Payment: eip155:8453:exact:0x8966...0fb7:0.05:0x..." \\\\
+  -H "X-Payment: eip155:84532:exact:0x8966...0fb7:0.05:0x..." \\\\
   -d '{"listing_text": "Christian family neighbourhood..."}'\`;
 
     const x402Code = \`<span class="code-comment">// Send a payment transaction hash as headers</span>
-X-Payment: eip155:8453:exact:0x8966A2aAe40e008f1f52962683Cb5D22aa700fb7:&lt;PRICE&gt;:&lt;TX_HASH&gt;
+X-Payment: eip155:84532:exact:0x8966A2aAe40e008f1f52962683Cb5D22aa700fb7:&lt;PRICE&gt;:&lt;TX_HASH&gt;
 
 <span class="code-comment">// Price endpoints table</span>
 /property/factual         $0.03 USDC
 /property/fha-compliance  $0.05 USDC
-/property/investor-metrics $0.10 USDC\`;
+/property/investor-metrics $0.10 USDC
+/property/analyze-text    $0.05 USDC
+/property/analyze-url     $0.05 USDC
+/property/analyze-image   $0.15 USDC\`;
 
     function switchCode(type) {
       document.querySelectorAll(".code-tab-btn").forEach(btn => btn.classList.remove("active"));
