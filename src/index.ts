@@ -33,7 +33,7 @@ app.use("*", cors({
 // --- WALLET & PROTOCOL CONFIG ---
 const WALLET_ADDRESS = "0x8966A2aAe40e008f1f52962683Cb5D22aa700fb7"; 
 const FACILITATOR_URL = "https://x402.org/facilitator";
-const NETWORK = "eip155:8453"; // Base Mainnet
+const NETWORK = "eip155:84532"; // Base Sepolia for testing. Use eip155:8453 for Base Mainnet.
 
 // --- PAID ENDPOINTS CONFIGURATION ---
 const x402Config = {
