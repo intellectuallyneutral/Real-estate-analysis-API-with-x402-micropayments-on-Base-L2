@@ -196,6 +196,178 @@ Sparks Digital LLC — sparksdigitalllc@email.com
 `);
 });
 
+// OpenAPI 3.1 specification — agents and crawlers use this to understand endpoints, pricing, and payment headers
+app.get("/openapi.json", (c) => {
+  return c.json({
+    openapi: "3.1.0",
+    info: {
+      title: "Sparks RE API",
+      version: "1.0.0",
+      description: "Real estate analysis API with x402 micropayments on Base L2. Three tools: property data extraction, FHA compliance scanning, and investment metrics. Operated by Sparks Digital LLC (Indiana).",
+      contact: { email: "sparksdigitalllc@email.com" }
+    },
+    servers: [
+      { url: "https://sparks-re-api.sparksdigital-re.workers.dev", description: "Production (Cloudflare Workers edge)" }
+    ],
+    paths: {
+      "/property/factual": {
+        post: {
+          summary: "Extract structured property data from listing text",
+          description: "Parses address, bed/bath, sqft, lot_size, year_built, property_type, and price from free-form text using regex. Cost: $0.03 USDC via x402 on Base (eip155:8453).",
+          operationId: "normalizeProperty",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["raw_text"],
+                  properties: {
+                    raw_text: { type: "string", description: "Free-form property listing text to parse" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Structured property data extracted successfully" },
+            "400": { description: "Missing or invalid raw_text field" },
+            "402": {
+              description: "Payment Required — x402 challenge. Send X-Payment header with USDC payment on Base (eip155:8453) to wallet 0x8966A2aAe40e008f1f52962683Cb5D22aa700fb7. Price: $0.03.",
+              headers: {
+                "X-Payment": { description: "x402 payment challenge details", schema: { type: "string" } }
+              }
+            }
+          }
+        }
+      },
+      "/property/fha-compliance": {
+        post: {
+          summary: "Scan listing text for Fair Housing Act violations",
+          description: "Checks listing copy against 50+ discriminatory patterns across all 7 federal protected classes (Race, Color, Religion, National Origin, Sex, Familial Status, Disability). Returns flagged phrases and compliant rewrite. Cost: $0.05 USDC via x402 on Base (eip155:8453).",
+          operationId: "checkFhaCompliance",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["listing_text"],
+                  properties: {
+                    listing_text: { type: "string", description: "Property marketing copy to scan for FHA violations" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "FHA compliance scan results with flagged phrases and compliant rewrite" },
+            "400": { description: "Missing or invalid listing_text field" },
+            "402": {
+              description: "Payment Required — x402 challenge. Send X-Payment header with USDC payment on Base (eip155:8453) to wallet 0x8966A2aAe40e008f1f52962683Cb5D22aa700fb7. Price: $0.05.",
+              headers: {
+                "X-Payment": { description: "x402 payment challenge details", schema: { type: "string" } }
+              }
+            }
+          }
+        }
+      },
+      "/property/investor-metrics": {
+        post: {
+          summary: "Calculate real estate investment metrics",
+          description: "Calculates cap rate, cash-on-cash return, DSCR, GRM, monthly cashflow, and NOI from property financials. Smart defaults for optional fields. Cost: $0.10 USDC via x402 on Base (eip155:8453).",
+          operationId: "calculateInvestorMetrics",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["purchase_price", "monthly_rent", "down_payment_percent"],
+                  properties: {
+                    purchase_price: { type: "number", description: "Purchase price in dollars" },
+                    monthly_rent: { type: "number", description: "Monthly rental income in dollars" },
+                    down_payment_percent: { type: "number", description: "Down payment percentage (0-100)" },
+                    interest_rate: { type: "number", description: "Annual rate % (default 7)" },
+                    loan_term_years: { type: "number", description: "Loan term years (default 30)" },
+                    annual_taxes: { type: "number", description: "Annual taxes (default 1.2% of price)" },
+                    annual_insurance: { type: "number", description: "Annual insurance (default $1200)" },
+                    vacancy_rate: { type: "number", description: "Vacancy rate decimal (default 0.08)" },
+                    management_fee: { type: "number", description: "Management fee decimal (default 0.10)" },
+                    estimated_repairs: { type: "number", description: "Annual repairs (default $0)" }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            "200": { description: "Investment metrics calculated successfully" },
+            "400": { description: "Missing or invalid required fields" },
+            "402": {
+              description: "Payment Required — x402 challenge. Send X-Payment header with USDC payment on Base (eip155:8453) to wallet 0x8966A2aAe40e008f1f52962683Cb5D22aa700fb7. Price: $0.10.",
+              headers: {
+                "X-Payment": { description: "x402 payment challenge details", schema: { type: "string" } }
+              }
+            }
+          }
+        }
+      },
+      "/health": {
+        get: {
+          summary: "Health check",
+          description: "Returns server status, wallet address, network, and endpoint listing. Free — no payment required.",
+          operationId: "healthCheck",
+          responses: { "200": { description: "Server status and endpoint listing" } }
+        }
+      },
+      "/llms.txt": {
+        get: {
+          summary: "Machine-readable API description",
+          description: "Returns a structured text manifest describing all endpoints, pricing, and usage for AI agent consumption. Free — no payment required.",
+          operationId: "llmsTxt",
+          responses: { "200": { description: "Plain text API manifest" } }
+        }
+      },
+      "/mcp": {
+        post: {
+          summary: "MCP server endpoint",
+          description: "Model Context Protocol endpoint using streamable HTTP transport. Exposes 3 tools: normalize_property, check_fha_compliance, calculate_investor_metrics. Free — no payment required (tools call logic directly).",
+          operationId: "mcpServer",
+          responses: { "200": { description: "MCP response" } }
+        }
+      }
+    },
+    "x-x402": {
+      protocol: "x402",
+      network: "eip155:8453",
+      networkName: "Base Mainnet",
+      token: "USDC",
+      facilitator: "https://x402.org/facilitator",
+      payTo: WALLET_ADDRESS
+    }
+  });
+});
+
+// Legacy GPT plugin manifest — backward compatibility with older agent frameworks
+app.get("/.well-known/ai-plugin.json", (c) => {
+  return c.json({
+    schema_version: "v1",
+    name_for_human: "Sparks RE API",
+    name_for_model: "sparks_re_api",
+    description_for_human: "Real estate analysis tools: property data extraction from listing text, FHA compliance scanning across 7 protected classes, and investment metrics (cap rate, DSCR, cash-on-cash, GRM). Micropayments via x402 on Base L2.",
+    description_for_model: "Use this plugin to analyze real estate properties. Three tools: (1) normalize_property extracts structured data (address, beds, baths, sqft, price, type) from unstructured listing text, (2) check_fha_compliance scans listing copy for Fair Housing Act violations across 7 protected classes and returns flagged phrases with a compliant rewrite, (3) calculate_investor_metrics computes cap rate, cash-on-cash return, DSCR, GRM, monthly cashflow from purchase price, rent, and down payment. Payment via x402 protocol (USDC on Base Mainnet). No API keys required.",
+    auth: { type: "none" },
+    api: {
+      type: "openapi",
+      url: "https://sparks-re-api.sparksdigital-re.workers.dev/openapi.json",
+      is_user_authenticated: false
+    },
+    logo_url: "https://sparks-re-api.sparksdigital-re.workers.dev/logo.png",
+    contact_email: "sparksdigitalllc@email.com",
+    legal_info_url: "https://github.com/intellectuallyneutral/Real-estate-analysis-API-with-x402-micropayments-on-Base-L2/blob/main/LICENSE"
+  });
+});
+
 // --- MCP SERVER ---
 import { getMcpHandler } from "./mcp";
 const mcpHandler = getMcpHandler();
