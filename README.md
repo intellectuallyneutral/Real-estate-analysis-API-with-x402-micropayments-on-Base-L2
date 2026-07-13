@@ -1,5 +1,7 @@
 # Sparks RE API
 
+[![smithery badge](https://smithery.ai/badge/sparks-digital/sparks-re-api)](https://smithery.ai/servers/sparks-digital/sparks-re-api)
+
 Real estate analysis API with **x402 micropayments** on **Base L2**. Built for autonomous AI agents — no API keys, no subscriptions, just pay-per-call with USDC.
 
 **Live at:** [`https://sparks-re-api.sparksdigital-re.workers.dev`](https://sparks-re-api.sparksdigital-re.workers.dev/health)
