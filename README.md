@@ -17,6 +17,25 @@ Real estate analysis API with **x402 micropayments** on **Base L2**. Built for a
 |----------|-------------|
 | `GET /health` | API status, wallet, and pricing |
 | `GET /llms.txt` | Machine-readable manifest |
+| `POST /mcp` | MCP server (streamable HTTP transport) |
+
+### MCP Server
+
+This API is also available as an **MCP server** at `/mcp` for direct integration with AI agents and MCP clients. The MCP endpoint exposes the same three tools without the x402 payment layer:
+
+- `normalize_property` — Extract structured property data from listing text
+- `check_fha_compliance` — Scan listing text for FHA violations
+- `calculate_investor_metrics` — Calculate investment metrics from financials
+
+```json
+{
+  "mcpServers": {
+    "sparks-re-api": {
+      "url": "https://sparks-re-api.sparksdigital-re.workers.dev/mcp"
+    }
+  }
+}
+```
 
 ## How Payment Works
 
