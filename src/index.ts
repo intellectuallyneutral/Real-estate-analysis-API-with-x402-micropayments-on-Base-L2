@@ -7,6 +7,8 @@ import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { normalizeProperty } from "./endpoints/normalizer";
 import { calculateMetrics } from "./endpoints/investorMetrics";
 import { checkFhaCompliance } from "./endpoints/fhaCompliance";
+import { landingPageHtml } from "./utils/landingPageHtml";
+import { analyzePropertyImage } from "./endpoints/imageAnalyzer";
 
 const app = new Hono();
 
@@ -118,6 +120,36 @@ const x402Config = {
         }
       })
     }
+  },
+  "POST /property/analyze-image": {
+    accepts: {
+      scheme: "exact",
+      price: "$0.15",
+      network: NETWORK,
+      payTo: WALLET_ADDRESS,
+    },
+    description: "Upload a screenshot of a real estate property listing. Uses multimodal AI to extract property specs, run FHA compliance scanning, and calculate investor returns in a single consolidated report. Cost: $0.15 USDC.",
+    extensions: {
+      ...declareDiscoveryExtension({
+        input: { image: "data:image/png;base64,iVBOR...", mime_type: "image/png" },
+        inputSchema: {
+          type: "object",
+          properties: {
+            image: { type: "string", description: "Base64-encoded image string of the listing screenshot" },
+            mime_type: { type: "string", description: "Mime type of the image (default image/png)" }
+          },
+          required: ["image"]
+        },
+        bodyType: "json",
+        output: {
+          example: {
+            listing_data: { address: "789 Maple Ave", city: "Indianapolis", state: "IN", zip: "46220", bedrooms: 3, bathrooms: 2, square_feet: 1850, lot_size: "0.25 acres", year_built: 1998, property_type: "SFR", raw_price: "$295,000", monthly_rent: 2200 },
+            fha_report: { is_compliant: true, violation_count: 0, flagged_phrases: [], compliant_rewrite: "..." },
+            investor_metrics: { purchase_price: 295000, down_payment: 59000, loan_amount: 236000, monthly_mortgage: 1569.96, monthly_expenses: 2132.96, monthly_cashflow: 67.04, annual_noi: 20112, cap_rate_percent: 6.82, cash_on_cash_percent: 1.36, dscr: 1.25, gross_rent_multiplier: 11.17 }
+          }
+        }
+      })
+    }
   }
 };
 
@@ -145,6 +177,11 @@ const lazyPaymentMiddleware = () => {
 
 // --- FREE ENDPOINTS ---
 
+// Root route — HTML landing page
+app.get("/", (c) => {
+  return c.html(landingPageHtml);
+});
+
 // Health check — agents use this to verify the server is alive
 app.get("/health", (c) => {
   return c.json({
@@ -156,7 +193,8 @@ app.get("/health", (c) => {
     endpoints: [
       { path: "/property/factual", price: "$0.03", method: "POST" },
       { path: "/property/fha-compliance", price: "$0.05", method: "POST" },
-      { path: "/property/investor-metrics", price: "$0.10", method: "POST" }
+      { path: "/property/investor-metrics", price: "$0.10", method: "POST" },
+      { path: "/property/analyze-image", price: "$0.15", method: "POST" }
     ]
   });
 });
@@ -372,7 +410,7 @@ app.get("/.well-known/ai-plugin.json", (c) => {
 import { getMcpHandler } from "./mcp";
 const mcpHandler = getMcpHandler();
 app.all("/mcp", async (c) => {
-  return mcpHandler(c.req.raw, c.env, c.executionCtx);
+  return mcpHandler(c.req.raw, c.env, c.executionCtx as any);
 });
 
 // --- ROUTE IMPLEMENTATIONS ---
@@ -445,6 +483,113 @@ app.post("/property/investor-metrics", lazyPaymentMiddleware(), async (c) => {
     return c.json({ ...result, disclaimer: "Estimates based on provided inputs and standard formulas. Not financial advice. Actual returns may vary based on market conditions, property specifics, and factors not captured in this model. Consult a licensed financial advisor before making investment decisions." });
   } catch (e) {
     return c.json({ error: "Invalid request body" }, 400);
+  }
+});
+
+// Consolidated image analysis handler helper
+function processConsolidatedAnalysis(result: any) {
+  // 1. Run FHA check if a description is present
+  let fhaReport = null;
+  if (result.listing_description) {
+    fhaReport = checkFhaCompliance({ listing_text: result.listing_description });
+  }
+
+  // 2. Run investor metrics if purchase price is found
+  let investorMetrics = null;
+  const priceString = result.raw_price ? result.raw_price.replace(/[^0-9.]/g, "") : "";
+  const price = priceString ? parseFloat(priceString) : NaN;
+  const rent = result.monthly_rent ? parseFloat(String(result.monthly_rent)) : NaN;
+
+  if (!isNaN(price) && price > 0) {
+    // If rent is not present, estimate it at 0.8% of purchase price as a smart default
+    const estimatedRent = !isNaN(rent) && rent > 0 ? rent : price * 0.008;
+    investorMetrics = calculateMetrics({
+      purchase_price: price,
+      monthly_rent: estimatedRent,
+      down_payment_percent: 20
+    });
+  }
+
+  const { listing_description, ...cleanListingData } = result;
+
+  return {
+    listing_data: cleanListingData,
+    fha_report: fhaReport,
+    investor_metrics: investorMetrics
+  };
+}
+
+// Paid Image Analyzer Endpoint (x402 protected)
+app.post("/property/analyze-image", lazyPaymentMiddleware(), async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!body.image || typeof body.image !== "string") {
+      return c.json({ error: "Missing required field: image (base64 string)" }, 400);
+    }
+    const apiKey = (c.env as any).GEMINI_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Server configuration error: Gemini API key is missing." }, 500);
+    }
+    const rawResult = await analyzePropertyImage(body.image, body.mime_type, apiKey);
+    const consolidated = processConsolidatedAnalysis(rawResult);
+    return c.json({ ...consolidated, disclaimer: "Automated AI extraction and rule-based calculations. Estimates only, not legal or financial advice. Verify all values." });
+  } catch (e: any) {
+    console.error("Image analysis endpoint error:", e);
+    return c.json({ error: e.message || "Failed to analyze property image" }, 500);
+  }
+});
+
+// Free Trial Endpoint for Sandbox Interface (no payment middleware)
+app.post("/property/free-trial", async (c) => {
+  try {
+    const body = await c.req.json();
+    const action = body.action;
+
+    if (action === "fha") {
+      if (!body.listing_text || typeof body.listing_text !== "string") {
+        return c.json({ error: "Missing listing_text" }, 400);
+      }
+      return c.json(checkFhaCompliance(body));
+    } else if (action === "normalize") {
+      if (!body.raw_text || typeof body.raw_text !== "string") {
+        return c.json({ error: "Missing raw_text" }, 400);
+      }
+      return c.json(normalizeProperty(body));
+    } else if (action === "calculator") {
+      if (body.purchase_price === undefined || body.monthly_rent === undefined || body.down_payment_percent === undefined) {
+        return c.json({ error: "Missing required calculator fields" }, 400);
+      }
+      return c.json(calculateMetrics({
+        purchase_price: parseFloat(body.purchase_price),
+        monthly_rent: parseFloat(body.monthly_rent),
+        down_payment_percent: parseFloat(body.down_payment_percent),
+        interest_rate: body.interest_rate !== undefined ? parseFloat(body.interest_rate) : undefined
+      }));
+    } else {
+      return c.json({ error: "Invalid action" }, 400);
+    }
+  } catch (e) {
+    return c.json({ error: "Failed to process sandbox action" }, 400);
+  }
+});
+
+// Free Trial Image Endpoint for Sandbox Interface
+app.post("/property/free-trial-image", async (c) => {
+  try {
+    const body = await c.req.json();
+    if (!body.image || typeof body.image !== "string") {
+      return c.json({ error: "Missing image base64 data" }, 400);
+    }
+    const apiKey = (c.env as any).GEMINI_API_KEY;
+    if (!apiKey) {
+      return c.json({ error: "Server configuration error: Gemini API key is missing." }, 500);
+    }
+    const rawResult = await analyzePropertyImage(body.image, body.mime_type, apiKey);
+    const consolidated = processConsolidatedAnalysis(rawResult);
+    return c.json(consolidated);
+  } catch (e: any) {
+    console.error("Free trial image error:", e);
+    return c.json({ error: e.message || "Failed to analyze image" }, 500);
   }
 });
 

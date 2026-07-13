@@ -71,7 +71,13 @@ function createMcpServer(): McpServer {
     async ({ raw_text }) => {
       const result = normalizeProperty({ raw_text });
       return {
-        structuredContent: result,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result)
+          }
+        ],
+        structuredContent: result as any,
       };
     }
   );
@@ -94,7 +100,13 @@ function createMcpServer(): McpServer {
     async ({ listing_text }) => {
       const result = checkFhaCompliance({ listing_text });
       return {
-        structuredContent: result,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result)
+          }
+        ],
+        structuredContent: result as any,
       };
     }
   );
@@ -137,7 +149,13 @@ function createMcpServer(): McpServer {
         estimated_repairs: params.estimated_repairs,
       });
       return {
-        structuredContent: result,
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result)
+          }
+        ],
+        structuredContent: result as any,
       };
     }
   );
