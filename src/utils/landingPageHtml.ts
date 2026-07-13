@@ -804,7 +804,7 @@ export const landingPageHtml = `
               <button class="btn btn-primary" style="justify-content: center;" onclick="runUrlAnalysis()" id="btn-run-url">Scrape & Analyze URL</button>
             </div>
             <div class="panel-output">
-              <div class="panel-title">API Response JSON</div>
+              <div class="panel-title">Analysis Report</div>
               <div class="output-container" id="output-url">
                 <div class="output-placeholder">Enter a webpage URL and run analysis to view output.</div>
                 <div class="loader"><div class="spinner"></div><span>Scrubbing listing page and generating report...</span></div>
@@ -836,7 +836,7 @@ export const landingPageHtml = `
               </button>
             </div>
             <div class="panel-output">
-              <div class="panel-title">API Response JSON</div>
+              <div class="panel-title">Analysis Report</div>
               <div class="output-container" id="output-image">
                 <div class="output-placeholder">Upload an image and run analysis to view the API response.</div>
                 <div class="loader"><div class="spinner"></div><span>Extracting property details and running metrics...</span></div>
@@ -861,7 +861,7 @@ export const landingPageHtml = `
               <button class="btn btn-primary" style="justify-content: center;" onclick="runTextAnalysis()" id="btn-run-text">Analyze Raw Copy</button>
             </div>
             <div class="panel-output">
-              <div class="panel-title">API Response JSON</div>
+              <div class="panel-title">Analysis Report</div>
               <div class="output-container" id="output-text">
                 <div class="output-placeholder">Submit listing copy to see consolidated FHA and investment report.</div>
                 <div class="loader"><div class="spinner"></div><span>Extracting listing parameters and analyzing compliance...</span></div>
@@ -901,7 +901,7 @@ export const landingPageHtml = `
               <button class="btn btn-primary" style="justify-content: center;" onclick="runCalculator()" id="btn-run-calc">Calculate Investment Metrics</button>
             </div>
             <div class="panel-output">
-              <div class="panel-title">API Response JSON</div>
+              <div class="panel-title">Analysis Report</div>
               <div class="output-container" id="output-investor">
                 <div class="output-placeholder">Calculate to view cashflow, cap rate, and mortgage details.</div>
                 <div class="loader"><div class="spinner"></div><span>Calculating financial returns...</span></div>
