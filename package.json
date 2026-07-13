@@ -1,6 +1,8 @@
 {
   "name": "sparks-re-api",
   "version": "1.0.0",
+  "description": "Real estate analysis tools (property data extraction, FHA compliance scanning, investment metrics) with x402 micropayments on Base L2.",
+  "homepage": "https://github.com/intellectuallyneutral/Real-estate-analysis-API-with-x402-micropayments-on-Base-L2",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
